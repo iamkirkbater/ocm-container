@@ -18,7 +18,8 @@ ${CONTAINER_SUBSYS} run -it --rm --privileged \
 -e OCM_URL \
 -e "SSH_AUTH_SOCK=/tmp/ssh.sock" \
 -v ${SSH_AUTH_SOCK}:/tmp/ssh.sock \
--v ${HOME}/.config/ocm-env:/root/.config \
+-v ${HOME}/.config/ocm-env:/root/.config/ocm-env \
 -v ${HOME}/.ssh:/root/.ssh \
 -v ${HOME}/.aws/credentials:/root/.aws/credentials \
-ocm-env /bin/bash
+-v ${HOME}/Library/Application\ Support/Google/Chrome/Default:/root/.config/google-chrome/default \
+ocm-env:chrome /bin/bash

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source /usr/local/kube_ps1/kube-ps1.sh
-source ${HOME}/.config/env.source
+source ${HOME}/.config/ocm-env/env.source
 complete -C '/usr/local/aws/aws/dist/aws_completer' aws
 
 function cluster_function() {

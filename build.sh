@@ -38,7 +38,7 @@ date -u
 
 time ${CONTAINER_SUBSYS} build \
   --build-arg osv4client=${osv4client} \
-  -t ocm-env .
+  -t ocm-env:chromebase .
 
 # for time tracking
 date
