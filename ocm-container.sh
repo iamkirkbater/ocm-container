@@ -78,10 +78,18 @@ source ${OCM_CONTAINER_CONFIGFILE}
 operating_system=`uname`
 
 SSH_AGENT_MOUNT="-v ${SSH_AUTH_SOCK}:/tmp/ssh.sock:ro"
+SSH_AUTH_SOCK_ENV="-e \"SSH_AUTH_SOCK=/tmp/ssh.sock\""
 
-if [[ "$operating_system" == "Darwin" ]]
+if [[ "$CONTAINER_SUBSYS" != "podman" ]] && [[  "$operating_system" == "Darwin" ]]
 then
   SSH_AGENT_MOUNT="--mount type=bind,src=/run/host-services/ssh-auth.sock,target=/tmp/ssh.sock,readonly"
+fi
+
+if [[ "$CONTAINER_SUBSYS" == podman ]] && [[ "$operating_system" == "Darwin" ]]
+then
+  agent_location=$(podman machine ssh 'ls /private/tmp | grep com.apple.launchd')
+  SSH_AGENT_MOUNT="-v /private/tmp/$agent_location:/tmp/ssh:ro"
+  SSH_AUTH_SOCK_ENV="-e \"SSH_AUTH_SOCK=/tmp/ssh/Listeners\""
 fi
 
 ### AWS token pull
@@ -153,8 +161,9 @@ fi
 CONTAINER=$(${CONTAINER_SUBSYS} create $TTY --rm --privileged \
 -e "OCM_URL" \
 -e "USER" \
--e "SSH_AUTH_SOCK=/tmp/ssh.sock" \
 -e "OFFLINE_ACCESS_TOKEN" \
+--mount type=tmpfs,destination=/root/.ssh/sockets \
+${SSH_AUTH_SOCK_ENV} \
 ${INITIAL_CLUSTER_LOGIN} \
 -v ${CONFIG_DIR}:/root/.config/ocm-container:ro \
 -v ${HOME}/.ssh:/root/.ssh:ro \
@@ -164,7 +173,6 @@ ${AWSFILEMOUNT} \
 ${SSH_AGENT_MOUNT} \
 ${OPS_UTILS_DIR_MOUNT} \
 ${SCRATCH_DIR_MOUNT} \
-${SOCKET_MOUNT} \
 ${PORT_MAP_OPTS} \
 ${OCM_CONTAINER_LAUNCH_OPTS} \
 ocm-container:${BUILD_TAG} ${EXEC_SCRIPT})
