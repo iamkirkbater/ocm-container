@@ -82,40 +82,16 @@ RUN curl -sSlo epel-gpg https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
         rhash \
     && microdnf clean all
 
+# Directory for the extracted binaries, etc
+RUN mkdir -p /out
+
+
+
+FROM builder as oc-builder
 # Add `oc` to interact with openshift clusters (similar to kubectl)
 # Replace version with a version number to pin a specific version (eg: "4.7.8")
 ARG OC_VERSION="stable"
 ENV OC_URL="https://mirror.openshift.com/pub/openshift-v4/aarch64/clients/ocp/${OC_VERSION}"
-
-# Add `ocm` utility for interacting with the ocm-api
-# Replace "/latest" with "/tags/{tag}" to pin to a specific version (eg: "/tags/v0.4.0")
-# the URL_SLUG is for checking the releasenotes when a version updates
-ARG OCM_VERSION="tags/v0.1.64"
-ENV OCM_URL_SLUG="openshift-online/ocm-cli"
-ENV OCM_URL="https://api.github.com/repos/${OCM_URL_SLUG}/releases/${OCM_VERSION}"
-
-# Add `osdctl` utility for interacting with osd clusters`
-# Replace "/latest" with "/tags/{tag}" to pin to a specific version (eg: "/tags/v0.4.0")
-# the URL_SLUG is for checking the releasenotes when a version updates
-ARG OSDCTL_VERSION="tags/v0.13.0"
-ENV OSDCTL_URL_SLUG="openshift/osdctl"
-ENV OSDCTL_URL="https://api.github.com/repos/${OSDCTL_URL_SLUG}/releases/${OSDCTL_VERSION}"
-
-# Add `yq` utility for programatic yaml parsing
-# the URL_SLUG is for checking the releasenotes when a version updates
-ARG YQ_VERSION="tags/v4.25.3"
-ENV YQ_URL_SLUG="mikefarah/yq"
-ENV YQ_URL="https://api.github.com/repos/${YQ_URL_SLUG}/releases/${YQ_VERSION}"
-
-# Replace AWS client zipfile with specific file to pin to a specific version
-# (eg: "awscli-exe-linux-x86_64-2.7.11.zip")
-ARG AWSCLI_VERSION="awscli-exe-linux-aarch64.zip"
-ENV AWSCLI_URL="https://awscli.amazonaws.com/${AWSCLI_VERSION}"
-ENV AWSSIG_URL="https://awscli.amazonaws.com/${AWSCLI_VERSION}.sig"
-
-# Directory for the extracted binaries, etc
-RUN mkdir -p /out
-
 # Install the latest OC Binary from the mirror
 RUN mkdir /oc
 WORKDIR /oc
@@ -127,6 +103,14 @@ RUN /bin/bash -c "curl -sSLf -O ${OC_URL}/$(awk -v asset="openshift-client-linux
 RUN bash -c 'sha256sum --check <( grep openshift-client-linux sha256sum.txt | head -n 1)'
 RUN tar --extract --gunzip --no-same-owner --directory /out oc --file *.tar.gz
 
+
+FROM builder as ocm-builder
+# Add `ocm` utility for interacting with the ocm-api
+# Replace "/latest" with "/tags/{tag}" to pin to a specific version (eg: "/tags/v0.4.0")
+# the URL_SLUG is for checking the releasenotes when a version updates
+ARG OCM_VERSION="tags/v0.1.64"
+ENV OCM_URL_SLUG="openshift-online/ocm-cli"
+ENV OCM_URL="https://api.github.com/repos/${OCM_URL_SLUG}/releases/${OCM_VERSION}"
 # Install ocm
 # ocm is not in a tarball
 RUN mkdir /ocm
@@ -139,6 +123,14 @@ RUN /bin/bash -c "curl -sSLf -O $(curl -sSLf ${OCM_URL} -o - | jq -r '.assets[] 
 RUN bash -c "sha256sum --check <( grep linux  sha256sum.txt )"
 RUN cp ocm* /out/ocm
 
+
+FROM builder as osdctl-builder
+# Add `osdctl` utility for interacting with osd clusters`
+# Replace "/latest" with "/tags/{tag}" to pin to a specific version (eg: "/tags/v0.4.0")
+# the URL_SLUG is for checking the releasenotes when a version updates
+ARG OSDCTL_VERSION="tags/v0.13.0"
+ENV OSDCTL_URL_SLUG="openshift/osdctl"
+ENV OSDCTL_URL="https://api.github.com/repos/${OSDCTL_URL_SLUG}/releases/${OSDCTL_VERSION}"
 # Install osdctl
 RUN mkdir /osdctl
 WORKDIR /osdctl
@@ -150,6 +142,13 @@ RUN /bin/bash -c "curl -sSLf -O $(curl -sSLf ${OSDCTL_URL} -o - | jq -r '.assets
 RUN bash -c 'sha256sum --check <( grep Linux_arm64  sha256sum.txt )'
 RUN tar --extract --gunzip --no-same-owner --directory /out osdctl --file *.tar.gz
 
+
+FROM builder as yq-builder
+# Add `yq` utility for programatic yaml parsing
+# the URL_SLUG is for checking the releasenotes when a version updates
+ARG YQ_VERSION="tags/v4.25.3"
+ENV YQ_URL_SLUG="mikefarah/yq"
+ENV YQ_URL="https://api.github.com/repos/${YQ_URL_SLUG}/releases/${YQ_VERSION}"
 # Install yq
 RUN mkdir /yq
 WORKDIR /yq
@@ -162,7 +161,15 @@ RUN /bin/bash -c "curl -sSLf -O $(curl -sSLf ${YQ_URL} -o - | jq -r '.assets[] |
 # This is terrible, but not sure how to do this better.
 ENV LD_LIBRARY_PATH=/usr/local/lib
 RUN bash -c 'rhash -a -c <( grep ^yq_linux_arm64\  checksums)'
-RUN cp yq_linux_${ARCH} /out/yq
+RUN cp yq_linux_arm64 /out/yq
+
+
+FROM builder as aws-builder
+# Replace AWS client zipfile with specific file to pin to a specific version
+# (eg: "awscli-exe-linux-x86_64-2.7.11.zip")
+ARG AWSCLI_VERSION="awscli-exe-linux-aarch64.zip"
+ENV AWSCLI_URL="https://awscli.amazonaws.com/${AWSCLI_VERSION}"
+ENV AWSSIG_URL="https://awscli.amazonaws.com/${AWSCLI_VERSION}.sig"
 
 # Install aws-cli
 RUN mkdir -p /aws/bin
@@ -183,22 +190,22 @@ RUN unzip awscliv2.zip
 # Install the bins to the /aws/bin dir so the final image build copy is easier
 RUN ./aws/install -b /aws/bin
 
-
-# Make binaries executable
-RUN chmod -R +x /out
-
 ### Build the final image
 # This is based on the first image build, with the yum packages installed
 FROM dnf-install
 
 # Copy previously acquired binaries into the $PATH
 ENV BIN_DIR="/usr/local/bin"
-COPY --from=builder /out/oc ${BIN_DIR}
-COPY --from=builder /out/ocm ${BIN_DIR}
-COPY --from=builder /out/osdctl ${BIN_DIR}
-COPY --from=builder /aws/bin/ ${BIN_DIR}
-COPY --from=builder /usr/local/aws-cli /usr/local/aws-cli
-COPY --from=builder /out/yq ${BIN_DIR}
+COPY --from=oc-builder /out/oc ${BIN_DIR}
+COPY --from=ocm-builder /out/ocm ${BIN_DIR}
+COPY --from=osdctl-builder /out/osdctl ${BIN_DIR}
+COPY --from=aws-builder /aws/bin/ ${BIN_DIR}
+COPY --from=aws-builder /usr/local/aws-cli /usr/local/aws-cli
+COPY --from=yq-builder /out/yq ${BIN_DIR}
+
+# Make binaries executable
+RUN chmod -R +x ${BIN_DIR}
+
 
 # Validate
 RUN oc completion bash > /etc/bash_completion.d/oc
@@ -222,7 +229,6 @@ RUN pip3 install --no-cache-dir o-must-gather${O_MUST_GATHER_VERSION}
 ARG PAGERDUTY_VERSION="latest"
 ENV HOME=/root
 RUN npm install -g pagerduty-cli@${PAGERDUTY_VERSION}
-
 
 
 # Setup bashrc.d directory
