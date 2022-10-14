@@ -94,6 +94,13 @@ ARG OCM_VERSION="tags/v0.1.64"
 ENV OCM_URL_SLUG="openshift-online/ocm-cli"
 ENV OCM_URL="https://api.github.com/repos/${OCM_URL_SLUG}/releases/${OCM_VERSION}"
 
+# Add `osdctl` utility for interacting with osd clusters`
+# Replace "/latest" with "/tags/{tag}" to pin to a specific version (eg: "/tags/v0.4.0")
+# the URL_SLUG is for checking the releasenotes when a version updates
+ARG OSDCTL_VERSION="tags/v0.13.0"
+ENV OSDCTL_URL_SLUG="openshift/osdctl"
+ENV OSDCTL_URL="https://api.github.com/repos/${OSDCTL_URL_SLUG}/releases/${OSDCTL_VERSION}"
+
 # Add `yq` utility for programatic yaml parsing
 # the URL_SLUG is for checking the releasenotes when a version updates
 ARG YQ_VERSION="tags/v4.25.3"
@@ -131,6 +138,17 @@ RUN /bin/bash -c "curl -sSLf -O $(curl -sSLf ${OCM_URL} -o - | jq -r '.assets[] 
 # Check the binary and checksum match
 RUN bash -c "sha256sum --check <( grep linux  sha256sum.txt )"
 RUN cp ocm* /out/ocm
+
+# Install osdctl
+RUN mkdir /osdctl
+WORKDIR /osdctl
+# Download the checksum
+RUN /bin/bash -c "curl -sSLf $(curl -sSLf ${OSDCTL_URL} -o - | jq -r '.assets[] | select(.name|test("sha256sum.txt")) | .browser_download_url') -o sha256sum.txt"
+# Download the binary tarball
+RUN /bin/bash -c "curl -sSLf -O $(curl -sSLf ${OSDCTL_URL} -o - | jq -r '.assets[] | select(.name|test("Linux_arm64")) | .browser_download_url') "
+# Check the tarball and checksum match
+RUN bash -c 'sha256sum --check <( grep Linux_arm64  sha256sum.txt )'
+RUN tar --extract --gunzip --no-same-owner --directory /out osdctl --file *.tar.gz
 
 # Install yq
 RUN mkdir /yq
@@ -177,6 +195,7 @@ FROM dnf-install
 ENV BIN_DIR="/usr/local/bin"
 COPY --from=builder /out/oc ${BIN_DIR}
 COPY --from=builder /out/ocm ${BIN_DIR}
+COPY --from=builder /out/osdctl ${BIN_DIR}
 COPY --from=builder /aws/bin/ ${BIN_DIR}
 COPY --from=builder /usr/local/aws-cli /usr/local/aws-cli
 COPY --from=builder /out/yq ${BIN_DIR}
