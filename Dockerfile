@@ -151,6 +151,7 @@ RUN bash -c 'sha256sum --check <( grep Linux_arm64  sha256sum.txt )'
 RUN tar --extract --gunzip --no-same-owner --directory /out osdctl --file *.tar.gz
 
 # Install yq
+ARG ARCH=arm64
 RUN mkdir /yq
 WORKDIR /yq
 # Download the checksum
