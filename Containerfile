@@ -128,10 +128,8 @@ COPY --from=backplane-tools /${OUTPUT_DIR}/rosa          ${BIN_DIR}
 RUN rosa completion bash > /etc/bash_completion.d/rosa
 
 COPY --from=backplane-tools /${OUTPUT_DIR}/servicelogger ${BIN_DIR}
-RUN servicelogger completion bash > /etc/bash_completion.d/servicelogger
-
-COPY --from=backplane-tools /${OUTPUT_DIR}/yq            ${BIN_DIR}
-RUN yq --version
+# COPY --from=backplane-tools /${OUTPUT_DIR}/yq            ${BIN_DIR}
+COPY --from=hypershift      /${OUTPUT_DIR}/hypershift    ${BIN_DIR}
 
 ### DNF Install other tools on top of Minimal
 FROM ocm-container-minimal as dnf-install
@@ -271,8 +269,22 @@ RUN jira completion bash > /etc/bash_completion.d/jira
 COPY --from=omc-builder       /${OUTPUT_DIR}/omc       ${BIN_DIR}
 RUN ocm completion bash > /etc/bash_completion.d/omc
 
-COPY --from=oc-nodepp-builder /${OUTPUT_DIR}/oc-nodepp ${BIN_DIR}
-RUN oc-nodepp --help
+# Validate
+RUN /usr/local/aws-cli/aws --version
+RUN /usr/local/aws-cli/aws_completer bash > /etc/bash_completion.d/aws-cli
+RUN jira completion bash > /etc/bash_completion.d/jira
+RUN oc completion bash > /etc/bash_completion.d/oc
+RUN ocm completion > /etc/bash_completion.d/ocm
+RUN osdctl completion bash --skip-version-check > /etc/bash_completion.d/osdctl
+# RUN yq --version
+RUN k9s completion bash > /etc/bash_completion.d/k9s
+RUN ocm backplane version
+RUN ocm addons version
+RUN ocm backplane completion bash > /etc/bash_completion.d/ocm-backplane
+RUN [[ $(platform_convert "@@PLATFORM@@" --amd64 --arm64) != "amd64" ]] && echo "removing non-arm64 hypershift binary" && rm ${BIN_DIR}/hypershift || hypershift --version 2> /dev/null
+RUN rosa completion bash > /etc/bash_completion.d/rosa
+RUN servicelogger version
+RUN servicelogger completion bash > /etc/bash_completion.d/servicelogger
 
 # Install utils
 COPY utils/bin /root/.local/bin
