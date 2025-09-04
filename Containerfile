@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=registry.access.redhat.com/ubi10/ubi:10.0-1754586730
+ARG BASE_IMAGE=registry.access.redhat.com/ubi10/ubi:10.0-1756805986
 ARG HYPERSHIFT_BASE_IMAGE=quay.io/acm-d/rhtap-hypershift-operator
 FROM ${BASE_IMAGE} as tools-base
 ARG OUTPUT_DIR="/opt"
@@ -115,8 +115,7 @@ RUN /usr/local/aws-cli/aws_completer bash > /etc/bash_completion.d/aws-cli
 # Required to work around hypershift arch issues
 COPY utils/dockerfile_assets/platforms.sh /usr/local/bin/platform_convert
 COPY --from=hypershift      /${OUTPUT_DIR}/hypershift    ${BIN_DIR}
-RUN [[ $(platform_convert "@@PLATFORM@@" --amd64 --arm64) == "arm64" ]] && echo "removing non-arm64 hypershift binary" && rm ${BIN_DIR}/hypershift || hypershift --version 2> /dev/null
-RUN hypershift completion bash > /etc/bash_completion.d/hypershift
+RUN [[ $(platform_convert "@@PLATFORM@@" --amd64 --arm64) == "arm64" ]] && echo "removing non-arm64 hypershift binary" && rm ${BIN_DIR}/hypershift || hypershift completion bash > /etc/bash_completion.d/hypershift
 
 COPY --from=backplane-tools /${OUTPUT_DIR}/ocm-addons    ${BIN_DIR}
 RUN ocm addons completion bash > /etc/bash_completion.d/ocm-addons
@@ -277,7 +276,6 @@ RUN oc completion bash > /etc/bash_completion.d/oc
 RUN ocm completion > /etc/bash_completion.d/ocm
 RUN osdctl completion bash --skip-version-check > /etc/bash_completion.d/osdctl
 # RUN yq --version
-RUN k9s completion bash > /etc/bash_completion.d/k9s
 RUN ocm backplane version
 RUN ocm addons version
 RUN ocm backplane completion bash > /etc/bash_completion.d/ocm-backplane

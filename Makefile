@@ -192,7 +192,7 @@ endef
 # Builds the container image for local use without manifest
 define build_local_target
 	@echo "Building local image: $(1) for architecture: $(2) (without manifest)"
-	$(eval BUILD_FLAGS := --target=$(1) --platform=$(2) $(CACHE) $(BUILD_ARGS))
+	$(eval BUILD_FLAGS := --target=$(1) --platform=linux/$(2) $(CACHE) $(BUILD_ARGS))
 	$(eval BUILD_FLAGS += $(if $(GITHUB_BUILD_ARGS),$(GITHUB_BUILD_ARGS)))
 	$(eval BUILD_FLAGS += -f Containerfile)
 	$(eval PROJECT_LABELS += --label "architecture=$(2)")
